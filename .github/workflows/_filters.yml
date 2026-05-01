@@ -1,0 +1,85 @@
+name: Path filters
+
+on:
+  workflow_call:
+    inputs:
+      workflow:
+        description: "Caller's own workflow filename (e.g. 'docker.yml'). Drives the `self` output."
+        type: string
+        required: true
+    outputs:
+      code:
+        description: "code changes (excludes docs, lock files, workflows)"
+        value: ${{ jobs.filter.outputs.code }}
+      docker:
+        description: "Dockerfile, compose, setup scripts"
+        value: ${{ jobs.filter.outputs.docker }}
+      nix:
+        description: "flake.nix, flake.lock, nix/"
+        value: ${{ jobs.filter.outputs.nix }}
+      uv:
+        description: "uv.lock, pyproject.toml"
+        value: ${{ jobs.filter.outputs.uv }}
+      base_apt:
+        description: "uv.lock or Dockerfile.base-apt (rebuild base image)"
+        value: ${{ jobs.filter.outputs.base_apt }}
+      self:
+        description: "caller's own workflow file or _filters.yml"
+        value: ${{ jobs.filter.outputs.self }}
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter_code.outputs.code }}
+      docker: ${{ steps.filter_other.outputs.docker }}
+      nix: ${{ steps.filter_other.outputs.nix }}
+      uv: ${{ steps.filter_other.outputs.uv }}
+      base_apt: ${{ steps.filter_other.outputs.base_apt }}
+      self: ${{ steps.filter_other.outputs.self }}
+    steps:
+      - uses: actions/checkout@v6
+      # `every` is needed for negation patterns to work (a file matches only
+      # if it satisfies every rule, so '!docs/**' actually excludes docs).
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter_code
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '**'
+              - '!mkdocs.yml'
+              - '!docs/**'
+              - '!*.md'
+              - '!uv.lock'
+              - '!flake.lock'
+              - '!flake.nix'
+              - '!.github/**'
+      # Default `some` for positive lists: a file matches if it hits any
+      # one pattern. `every` would require a single file to match all
+      # patterns at once, which breaks base_apt: uv.lock bumps are
+      # frequent (dependabot) but Dockerfile.base-apt almost never
+      # changes, so the two are rarely touched together.
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter_other
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile*'
+              - 'docker-compose*.yml'
+              - 'setup.sh'
+              - 'setup-dev.sh'
+              - 'scripts/common.sh'
+            nix:
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'nix/**'
+            uv:
+              - 'uv.lock'
+              - 'pyproject.toml'
+            base_apt:
+              - 'uv.lock'
+              - 'Dockerfile.base-apt'
+            self:
+              - '.github/workflows/${{ inputs.workflow }}'
+              - '.github/workflows/_filters.yml'

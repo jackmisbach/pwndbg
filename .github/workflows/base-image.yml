@@ -4,15 +4,7 @@ on:
   push:
     branches:
       - dev
-    paths:
-      - 'uv.lock'
-      - 'Dockerfile.base-apt'
-      - '.github/workflows/base-image.yml'
   pull_request:
-    paths:
-      - 'uv.lock'
-      - 'Dockerfile.base-apt'
-      - '.github/workflows/base-image.yml'
 
 concurrency:
   # Pushes (dev): queue sequentially (prevent cache corruption)
@@ -26,7 +18,17 @@ permissions:
   actions: write
 
 jobs:
+  # filters: see _filters.yml
+  changes:
+    uses: ./.github/workflows/_filters.yml
+    with:
+      workflow: 'base-image.yml'
+
   base-image:
+    needs: changes
+    if: >-
+      needs.changes.outputs.base_apt == 'true' ||
+      needs.changes.outputs.self == 'true'
     strategy:
       matrix:
         platform_base:

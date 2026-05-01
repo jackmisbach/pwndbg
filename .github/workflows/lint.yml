@@ -8,27 +8,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Use dorny/paths-filter instead of on.paths so that skipped jobs report
-  # as passed to branch protection, allowing docs-only PRs to merge.
+  # filters: see _filters.yml
   changes:
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: dorny/paths-filter@f3ceefdc7ef57bc2d8560787d4b6c33e44044cec # master (unreleased, for predicate-quantifier)
-        id: filter
-        with:
-          predicate-quantifier: 'every'
-          filters: |
-            code:
-              - '**'
-              - '!mkdocs.yml'
-              - '!docs/**'
-              - '!*.md'
+    uses: ./.github/workflows/_filters.yml
+    with:
+      workflow: 'lint.yml'
 
   lint:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      needs.changes.outputs.code == 'true' ||
+      needs.changes.outputs.self == 'true'
     strategy:
       fail-fast: false
       matrix:

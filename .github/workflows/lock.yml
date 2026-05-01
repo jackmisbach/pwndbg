@@ -11,28 +11,19 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Use dorny/paths-filter instead of on.paths so that skipped jobs report
-  # as passed to branch protection, allowing docs-only PRs to merge.
+  # filters: see _filters.yml
   changes:
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@f3ceefdc7ef57bc2d8560787d4b6c33e44044cec # master (unreleased, for predicate-quantifier)
-        id: filter
-        with:
-          predicate-quantifier: 'every'
-          filters: |
-            code:
-              - '**'
-              - '!mkdocs.yml'
-              - '!docs/**'
-              - '!*.md'
+    uses: ./.github/workflows/_filters.yml
+    with:
+      workflow: 'lock.yml'
 
   check_release_build-gdb:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'push' ||
+      needs.changes.outputs.code == 'true' ||
+      needs.changes.outputs.nix == 'true' ||
+      needs.changes.outputs.self == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +60,11 @@ jobs:
 
   check_release_build-lldb:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'push' ||
+      needs.changes.outputs.code == 'true' ||
+      needs.changes.outputs.nix == 'true' ||
+      needs.changes.outputs.self == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -106,7 +101,10 @@ jobs:
 
   lock_flake:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'push' ||
+      needs.changes.outputs.nix == 'true' ||
+      needs.changes.outputs.self == 'true'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     steps:
@@ -120,7 +118,10 @@ jobs:
 
   lock_uv:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'push' ||
+      needs.changes.outputs.uv == 'true' ||
+      needs.changes.outputs.self == 'true'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     steps:
