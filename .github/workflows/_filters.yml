@@ -1,0 +1,105 @@
+name: Path filters
+
+# Shared path filters for docker.yml, lock.yml, tests.yml, lint.yml, base-image.yml.
+
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: "code changes (excludes docs, lock files, workflows)"
+        value: ${{ jobs.filter.outputs.code }}
+      docker:
+        description: "Dockerfile, compose, setup scripts"
+        value: ${{ jobs.filter.outputs.docker }}
+      nix:
+        description: "flake.nix, flake.lock, nix/"
+        value: ${{ jobs.filter.outputs.nix }}
+      uv:
+        description: "uv.lock, pyproject.toml"
+        value: ${{ jobs.filter.outputs.uv }}
+      base_apt:
+        description: "uv.lock or Dockerfile.base-apt (rebuild base image)"
+        value: ${{ jobs.filter.outputs.base_apt }}
+      ci_docker:
+        description: "docker.yml"
+        value: ${{ jobs.filter.outputs.ci_docker }}
+      ci_lock:
+        description: "lock.yml"
+        value: ${{ jobs.filter.outputs.ci_lock }}
+      ci_tests:
+        description: "tests.yml"
+        value: ${{ jobs.filter.outputs.ci_tests }}
+      ci_lint:
+        description: "lint.yml"
+        value: ${{ jobs.filter.outputs.ci_lint }}
+      ci_base_image:
+        description: "base-image.yml"
+        value: ${{ jobs.filter.outputs.ci_base_image }}
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter_code.outputs.code }}
+      docker: ${{ steps.filter_other.outputs.docker }}
+      nix: ${{ steps.filter_other.outputs.nix }}
+      uv: ${{ steps.filter_other.outputs.uv }}
+      base_apt: ${{ steps.filter_other.outputs.base_apt }}
+      ci_docker: ${{ steps.filter_other.outputs.ci_docker }}
+      ci_lock: ${{ steps.filter_other.outputs.ci_lock }}
+      ci_tests: ${{ steps.filter_other.outputs.ci_tests }}
+      ci_lint: ${{ steps.filter_other.outputs.ci_lint }}
+      ci_base_image: ${{ steps.filter_other.outputs.ci_base_image }}
+    steps:
+      - uses: actions/checkout@v6
+      # `every` is needed for negation patterns to work (a file matches only
+      # if it satisfies every rule, so '!docs/**' actually excludes docs).
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter_code
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '**'
+              - '!mkdocs.yml'
+              - '!docs/**'
+              - '!*.md'
+              - '!uv.lock'
+              - '!flake.lock'
+              - '!flake.nix'
+              - '!.github/**'
+      # Default `some` for positive lists: a file matches if it hits any
+      # one pattern. `every` would require a single file to match all
+      # patterns at once, which breaks base_apt: uv.lock bumps are
+      # frequent (dependabot) but Dockerfile.base-apt almost never
+      # changes, so the two are rarely touched together.
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter_other
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile*'
+              - 'docker-compose*.yml'
+              - 'setup.sh'
+              - 'setup-dev.sh'
+              - 'scripts/common.sh'
+            nix:
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'nix/**'
+            uv:
+              - 'uv.lock'
+              - 'pyproject.toml'
+            base_apt:
+              - 'uv.lock'
+              - 'Dockerfile.base-apt'
+            ci_docker:
+              - '.github/workflows/docker.yml'
+            ci_lock:
+              - '.github/workflows/lock.yml'
+            ci_tests:
+              - '.github/workflows/tests.yml'
+            ci_lint:
+              - '.github/workflows/lint.yml'
+            ci_base_image:
+              - '.github/workflows/base-image.yml'
