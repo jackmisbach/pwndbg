@@ -126,28 +126,29 @@ jobs:
           skip-extraction: ${{ github.event_name == 'pull_request' }}
 
       - name: Build Docker image
-        run: |
-          docker buildx build \
-            --progress=plain \
-            --platform ${{ matrix.platform_base.platform }} \
-            --build-arg image=${{ matrix.platform_base.base_image }} \
-            --cache-from type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }} \
-            -f ./Dockerfile.base-apt \
-            -t ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }} \
-            .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ./Dockerfile.base-apt
+          platforms: ${{ matrix.platform_base.platform }}
+          build-args: |
+            image=${{ matrix.platform_base.base_image }}
+          tags: ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }}
+          cache-from: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }}
 
       - name: Push Docker image
         if: github.ref == 'refs/heads/dev'
-        run: |
-          docker buildx build \
-            --progress=plain \
-            --platform ${{ matrix.platform_base.platform }} \
-            --build-arg image=${{ matrix.platform_base.base_image }} \
-            --cache-from type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }} \
-            --cache-to type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }},mode=max \
-            -f ./Dockerfile.base-apt \
-            -t ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }} \
-            --push .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ./Dockerfile.base-apt
+          platforms: ${{ matrix.platform_base.platform }}
+          build-args: |
+            image=${{ matrix.platform_base.base_image }}
+          tags: ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }}
+          push: true
+          cache-from: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }}
+          cache-to: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }},mode=max
 
   manifest-and-cleanup:
     runs-on: ubuntu-24.04-arm

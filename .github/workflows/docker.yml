@@ -87,16 +87,18 @@ jobs:
       - name: Docker Buildx ${{ matrix.image }} (cache-enabled)
         id: build
         if: github.event_name == 'push' || steps.build-check.outputs.needed == 'true'
-        run: |
-          docker buildx build \
-            --load \
-            --cache-from type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-amd64 \
-            ${{ github.event_name == 'push' && format('--cache-to type=registry,ref=ghcr.io/pwndbg/cache:{0}-amd64,mode=max', matrix.image) || '' }} \
-            -f ${{ matrix.dockerfile }} \
-            --build-arg image=${{ matrix.base }} \
-            -t ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-amd64 \
-            -t ghcr.io/pwndbg/pwndbg:${{ matrix.image }} \
-            .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: |
+            ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-amd64
+            ghcr.io/pwndbg/pwndbg:${{ matrix.image }}
+          build-args: |
+            image=${{ matrix.base }}
+          cache-from: type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-amd64
+          cache-to: ${{ github.event_name == 'push' && format('type=registry,ref=ghcr.io/pwndbg/cache:{0}-amd64,mode=max', matrix.image) || '' }}
 
       - name: Run Tests (GDB, DBG-GDB, DBG-LLDB in parallel) on ${{ matrix.image }}
         run: |
@@ -186,16 +188,18 @@ jobs:
       - name: Docker Buildx ${{ matrix.image }} (cache-enabled)
         id: build
         if: github.event_name == 'push' || steps.build-check.outputs.needed == 'true'
-        run: |
-          docker buildx build \
-            --load \
-            --cache-from type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-arm64 \
-            ${{ github.event_name == 'push' && format('--cache-to type=registry,ref=ghcr.io/pwndbg/cache:{0}-arm64,mode=max', matrix.image) || '' }} \
-            -f ${{ matrix.dockerfile }} \
-            --build-arg image=${{ matrix.base }} \
-            -t ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-arm64 \
-            -t ghcr.io/pwndbg/pwndbg:${{ matrix.image }} \
-            .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: |
+            ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-arm64
+            ghcr.io/pwndbg/pwndbg:${{ matrix.image }}
+          build-args: |
+            image=${{ matrix.base }}
+          cache-from: type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-arm64
+          cache-to: ${{ github.event_name == 'push' && format('type=registry,ref=ghcr.io/pwndbg/cache:{0}-arm64,mode=max', matrix.image) || '' }}
 
       - name: Run Tests (Cross, DBG-GDB, DBG-LLDB in parallel) on ${{ matrix.image }}
         run: |
