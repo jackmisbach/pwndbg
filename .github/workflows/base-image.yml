@@ -125,7 +125,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           skip-extraction: ${{ github.event_name == 'pull_request' }}
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
@@ -134,21 +134,9 @@ jobs:
           build-args: |
             image=${{ matrix.platform_base.base_image }}
           tags: ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }}
+          push: ${{ github.ref == 'refs/heads/dev' }}
           cache-from: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }}
-
-      - name: Push Docker image
-        if: github.ref == 'refs/heads/dev'
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        with:
-          context: .
-          file: ./Dockerfile.base-apt
-          platforms: ${{ matrix.platform_base.platform }}
-          build-args: |
-            image=${{ matrix.platform_base.base_image }}
-          tags: ghcr.io/pwndbg/base-apt:latest-${{ matrix.platform_base.tag_name }}
-          push: true
-          cache-from: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }}
-          cache-to: type=registry,ref=ghcr.io/pwndbg/base-apt:cache-${{ matrix.platform_base.tag_name }},mode=max
+          cache-to: ${{ github.ref == 'refs/heads/dev' && format('type=registry,ref=ghcr.io/pwndbg/base-apt:cache-{0},mode=max', matrix.platform_base.tag_name) || '' }}
 
   manifest-and-cleanup:
     runs-on: ubuntu-24.04-arm
