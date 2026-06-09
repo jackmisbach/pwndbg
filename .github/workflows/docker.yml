@@ -100,15 +100,19 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-amd64
           cache-to: ${{ github.event_name == 'push' && format('type=registry,ref=ghcr.io/pwndbg/cache:{0}-amd64,mode=max', matrix.image) || '' }}
 
-      # Push the built image before tests run: we publish whenever the build
-      # succeeds, regardless of the test result, so the registry stays in sync
-      # with dev even when tests fail (and the push survives a test timeout).
-      - name: Push full image to registry
-        if: ${{ github.event_name == 'push' && steps.build.outcome == 'success' }}
-        run: docker push ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-amd64
-
       - name: Run Tests (GDB, DBG-GDB, DBG-LLDB in parallel) on ${{ matrix.image }}
         run: |
+          # On dev, push the built image in the background so its upload overlaps
+          # the test run. The build-layer cache is already exported by the build
+          # step's cache-to, so this only uploads the image itself. We reap the
+          # push at the end and fold its result into the step's exit code.
+          push_pid=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            docker push ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-amd64 > /tmp/push.log 2>&1 &
+            push_pid=$!
+          fi
+
+          set +e
           docker compose run -T --rm --pull missing -v $(pwd):/pwndbg ${{ matrix.image }} bash -c '
             set -euo pipefail
             # Needed to prevent race conditions - prebuild binaries and create libpython symlink
@@ -142,6 +146,17 @@ jobs:
 
             exit $((gdb_exit | dbg_gdb_exit | dbg_lldb_exit))
           '
+          test_exit=$?
+          set -e
+
+          # wait for the background image push and fail the job if it failed
+          push_exit=0
+          if [ -n "$push_pid" ]; then
+            wait "$push_pid" || push_exit=$?
+            echo "===== docker push log ====="
+            cat /tmp/push.log
+          fi
+          exit $(( test_exit | push_exit ))
 
   docker_aarch64:
     needs: changes
@@ -204,15 +219,19 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/pwndbg/cache:${{ matrix.image }}-arm64
           cache-to: ${{ github.event_name == 'push' && format('type=registry,ref=ghcr.io/pwndbg/cache:{0}-arm64,mode=max', matrix.image) || '' }}
 
-      # Push the built image before tests run: we publish whenever the build
-      # succeeds, regardless of the test result, so the registry stays in sync
-      # with dev even when tests fail (and the push survives a test timeout).
-      - name: Push full image to registry
-        if: ${{ github.event_name == 'push' && steps.build.outcome == 'success' }}
-        run: docker push ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-arm64
-
       - name: Run Tests (Cross, DBG-GDB, DBG-LLDB in parallel) on ${{ matrix.image }}
         run: |
+          # On dev, push the built image in the background so its upload overlaps
+          # the test run. The build-layer cache is already exported by the build
+          # step's cache-to, so this only uploads the image itself. We reap the
+          # push at the end and fold its result into the step's exit code.
+          push_pid=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            docker push ghcr.io/pwndbg/pwndbg:${{ matrix.image }}-arm64 > /tmp/push.log 2>&1 &
+            push_pid=$!
+          fi
+
+          set +e
           docker compose run -T --rm --pull missing -v $(pwd):/pwndbg ${{ matrix.image }} bash -c '
             set -euo pipefail
             # Needed to prevent race conditions - prebuild binaries
@@ -245,6 +264,17 @@ jobs:
 
             exit $((cross_exit | dbg_gdb_exit | dbg_lldb_exit))
           '
+          test_exit=$?
+          set -e
+
+          # wait for the background image push and fail the job if it failed
+          push_exit=0
+          if [ -n "$push_pid" ]; then
+            wait "$push_pid" || push_exit=$?
+            echo "===== docker push log ====="
+            cat /tmp/push.log
+          fi
+          exit $(( test_exit | push_exit ))
 
   create_manifest:
     needs: [docker_x86-64, docker_aarch64]
